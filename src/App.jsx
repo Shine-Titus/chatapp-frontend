@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { Client } from "@stomp/stompjs";
+
 import "./app.css"
 import Login from "./login.jsx"
 import Register from "./register.jsx"
 import { loadRecent, removeRecent, addRecent, clearRecent } from './recentSearches.js';
+
 
 const API = "http://localhost:8080";
 
@@ -30,18 +32,25 @@ function App() {
   // searching 
   const [query, setQuery] = useState("");
 
-  // search history
+  // search history for hom
   const [recent, setRecent] = useState([]);
   const [searchFocused, setSearchFocused] = useState(false);
 
   // filter chats
   const [filter, setFilter] = useState("all");
 
+
   // search messages in chat
   const [showSearch, setShowSearch] = useState(false);
-  const [chatQuery, setChatQuery] = useState("");
-  const [chatRecent, setChatRecent] = useState([]);
   const [chatSearchFocused, setChatSearchFocused] = useState(false);
+
+  // scroll search in chat
+  const [chatQuery, setChatQuery] = useState("");
+  const [matchingMessages, setMatchingMessages] = useState([]);
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(null);
+
+  // search history for chats
+  const [chatRecent, setChatRecent] = useState([]);
 
   // forms
   const [groupName, setGroupName] = useState("");
@@ -52,15 +61,20 @@ function App() {
   const [actionError, setActionError] = useState("");
 
   const [tags, setTags] = useState([]);
-  const [activeTag, setActiveTag] = useState(null);
+  const [activeTags, setActiveTags] = useState(new Set());
   const [tagName, setTagName] = useState("");
   const [tagColor, setTagColor] = useState("#2563eb");
   const [tagError, setTagError] = useState("");
+
+  // universal search
+  const [messageHits, setMessageHits] = useState([]);
+  const [searching, setSearching] = useState(false);
 
   const stompClientRef = useRef(null);
   const selectedConversationRef = useRef(null);
   const messageEndRef = useRef(null);
   const conversationsRef = useRef([]);
+  const pendingJumpRef = useRef(null);
 
   // derived values
   const isActive = selectedConversation ? selectedConversation.isActive !== false : false;
@@ -69,7 +83,6 @@ function App() {
   // variables
   const homeKey = currentUser ? `recent:home:${currentUser.id}` : null;
   const chatKey = currentUser && selectedConversation ? `recent:chat:${currentUser.id}:${selectedConversation.id}` : null;
-
 
   const resetState = (message = "") => {
     setCurrentUser(null);
@@ -92,7 +105,7 @@ function App() {
     setSearchFocused(false);
     setQuery("");
     setTags([]);
-    setActiveTag(null);
+    setActiveTags(new Set());
     setTagName("");
     setTagError("");
   };
@@ -100,7 +113,6 @@ function App() {
   const sessionEnded = () => resetState("Your session ended. Please sign in again.");
 
   const titleOf = (c) => (c.type === "DIRECT" ? c.otherUsername : c.name);
-
 
   // effects
 
@@ -194,23 +206,61 @@ function App() {
 
   }, [selectedConversation?.id]);
 
-  const loadMembers = async (conversationId) => {
-    const res = await fetch(`${API}/conversations/${conversationId}/members`, {
-      credentials: "include",
-    }).catch(() => null);
 
-    if (!res) return;
-    if (res.status === 403) return sessionEnded();
-    if (res.status === 404) {
-      setSelectedConversation(null);
-      setScreen("home");
+
+  useEffect(() => {
+
+    if (!searching || query.trim().length < 2) {
+      setMessageHits([]);
       return;
     }
-    if (!res.ok) return;
 
-    const data = await res.json();
-    setMembers(Array.isArray(data) ? data : []);
-  }
+    const controller = new AbortController();
+
+    const timeoutId = setTimeout(() => {
+      fetch(`${API}/search?q=${encodeURIComponent(query)}`, { credentials: "include", signal: controller.signal })
+        .then((response) => {
+          if (response.status === 403) {
+            sessionEnded();
+            throw new Error("Session ended");
+          }
+          return response.json()
+        })
+        .then(setMessageHits)
+        .catch(error => {
+          if (error.name === "AbortError") {
+            console.log("Fetch request successfully cancelled!");
+          } else {
+            console.error("A real network error occurred:", error);
+          }
+        });
+    }, 300);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+
+  }, [searching, query]);
+
+  useEffect(() => {
+    if (screen !== "chat") return;
+
+    const id = pendingJumpRef.current;
+
+    if (id) {
+      const el = document.getElementById(`msg-${id}`);
+      if (el) {
+        el.scrollIntoView({ block: "center" });
+        pendingJumpRef.current = null;
+        return;
+      }
+      if (messages.length === 0) return;
+      pendingJumpRef.current = null;
+    }
+
+    messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, screen]);
 
   useEffect(() => {
     if (screen !== "members" || !selectedConversation) return;
@@ -218,10 +268,6 @@ function App() {
     loadMembers(selectedConversation.id);
   }, [screen]);
 
-  // keep newest message in view
-  useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, screen]);
 
   useEffect(() => { conversationsRef.current = conversations }, [conversations]);
 
@@ -236,6 +282,35 @@ function App() {
   useEffect(() => {
     setChatRecent(chatKey ? loadRecent(chatKey) : []);
   }, [chatKey]);
+
+  // runs when the user wants to navigate between searches in chat screen
+  useEffect(() => {
+    if (matchingMessages.length === 0) return;
+
+    const selectedMessage = matchingMessages[currentMessageIndex];
+    if (!selectedMessage) return;
+
+    const messageElement = document.querySelector(
+      `[data-message-id="${selectedMessage.id}"]`
+    );
+
+    if (!messageElement) return;
+
+    messageElement.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    })
+
+    messageElement.classList.add("active-search-match");
+
+    const timeout = setTimeout(() => {
+      messageElement.classList.remove("active-search-match");
+    }, 400);
+
+    return () => clearTimeout(timeout);
+
+
+  }, [currentMessageIndex, matchingMessages])
 
   useEffect(() => {
     if (!currentUser) return;
@@ -354,7 +429,7 @@ function App() {
     setSelectedConversation(conversation);
     setScreen("chat");
     if (conversation.id) markRead(conversation.id);
-  };
+  }
 
   const refreshConversations = () => {
     fetch(`${API}/conversations`, { credentials: "include" })
@@ -376,6 +451,24 @@ function App() {
     if (!res.ok) return console.error("Could not open chat", res.status);
 
     openConversation(await res.json());
+  }
+
+  const loadMembers = async (conversationId) => {
+    const res = await fetch(`${API}/conversations/${conversationId}/members`, {
+      credentials: "include",
+    }).catch(() => null);
+
+    if (!res) return;
+    if (res.status === 403) return sessionEnded();
+    if (res.status === 404) {
+      setSelectedConversation(null);
+      setScreen("home");
+      return;
+    }
+    if (!res.ok) return;
+
+    const data = await res.json();
+    setMembers(Array.isArray(data) ? data : []);
   }
 
   const sendMessage = async () => {
@@ -524,13 +617,29 @@ function App() {
     setTagName("");
   };
 
+  const removeFromTags = (id) => {
+    setActiveTags((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(id);
+      return newSet;
+    })
+  }
+
+  const addToTags = (id) => {
+    setActiveTags((prev) => {
+      const newSet = new Set(prev);
+      newSet.add(id);
+      return newSet;
+    })
+  }
+
   const deleteTag = async (tagId) => {
     const res = await fetch(`${API}/tags/${tagId}`, { method: "DELETE", credentials: "include" });
     if (res.status === 403) return sessionEnded();
     if (!res.ok) return setTagError("Could not delete tag");
 
     setTags((prev) => prev.filter((t) => t.id !== tagId));
-    if (activeTag === tagId) setActiveTag(null);
+    removeFromTags(tagId);
   };
 
   // attach or detach one conversation; the server returns the updated tag
@@ -555,9 +664,9 @@ function App() {
 
     const updated = await res.json();
     setTags((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+
   };
 
-  // tabs
   const tagsByConversation = {};
   tags.forEach((t) => {
     (t.conversationIds || []).forEach((cid) => {
@@ -569,6 +678,8 @@ function App() {
   const isTagSearch = raw.startsWith("#");
   const homeTerm = isTagSearch ? raw.slice(1) : raw;
 
+
+  // filter by tag
   const matchesTab = (c) => {
     if (filter === "unread") return c.unreadCount > 0;
     if (filter === "direct") return c.type === "DIRECT";
@@ -576,13 +687,17 @@ function App() {
     return true;
   };
 
+  // used to filter tags
   const matchesTag = (c) =>
-    activeTag === null || (tagsByConversation[c.id] || []).some((t) => t.id === activeTag);
+    activeTags.size === 0 || (tagsByConversation[c.id] || []).some((t) => activeTags.has(t.id));
 
+
+  // used to filter by text
   const matchesText = (c) =>
     isTagSearch
       ? (tagsByConversation[c.id] || []).some((t) => t.name.toLowerCase().startsWith(homeTerm))
       : (titleOf(c) || "").toLowerCase().includes(homeTerm);
+
 
   const filteredConversations = conversations.filter(
     (c) => matchesTab(c) && matchesTag(c) && matchesText(c)
@@ -592,10 +707,25 @@ function App() {
 
   const unreadTotal = conversations.filter((c) => c.unreadCount > 0).length;
 
+  // in chat filtering and searching
   const visibleMessages = chatQuery.trim()
     ? messages.filter((m) =>
       (m.content || "").toLowerCase().includes(chatQuery.trim().toLowerCase()))
     : messages;
+
+  // scroll to search feature for in chat
+  const addChatSearchResults = (visibleMessages) => {
+    setMatchingMessages(visibleMessages);
+    if (matchingMessages.length > 0) {
+      setCurrentMessageIndex(0);
+    }
+  }
+
+  useEffect(() => {
+    addChatSearchResults(visibleMessages);
+  }, [chatQuery])
+
+  // addChatSearchResults(visibleMessages);
 
   const saveHomeSearch = () => {
     if (!homeKey) return;
@@ -895,11 +1025,37 @@ function App() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   saveChatSearch();
-                  nextMatch();
+                  setCurrentMessageIndex(prev => prev + 1);
                 }
               }}
               autoFocus
             />
+
+            <div className="search-navigation">
+              <span className="search-counter">
+                {matchingMessages.length > 0
+                  ? `${currentMessageIndex + 1} of ${matchingMessages.length}`
+                  : "0 of 0"}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => { currentMessageIndex > 0 ? setCurrentMessageIndex(prev => prev - 1) : setCurrentMessageIndex(prev => prev - 0) }}
+                disabled={matchingMessages.length === 0}
+                title="Previous match"
+              >
+                ↑
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { currentMessageIndex < matchingMessages.length - 1 ? setCurrentMessageIndex(prev => prev + 1) : setCurrentMessageIndex(prev => prev + 0) }}
+                disabled={matchingMessages.length === 0}
+                title="Next match"
+              >
+                ↓
+              </button>
+            </div>
 
             {chatSearchFocused && !chatQuery && chatRecent.length > 0 && (
               <div className="recent-dropdown">
@@ -943,13 +1099,16 @@ function App() {
             </button>
 
           </div>
-        )}
+        )
+        }
 
         <div className="messages">
 
-          {visibleMessages.map((message) => (
+          {messages.map((message) => (
             <div
               key={message.id}
+              id={`msg-${message.id}`}
+              data-message-id={message.id}
               className={`message ${message.senderId === currentUser.id ? "message-you" : "message-other"}`}
             >
               <strong>{message.senderId === currentUser.id ? "You" : message.senderUsername}</strong>
@@ -969,22 +1128,24 @@ function App() {
           <div ref={messageEndRef} />
         </div>
 
-        {isActive ? (
-          <div className="message-input">
-            <input
-              type="text"
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              placeholder="Type a message..."
-            />
-            <button onClick={sendMessage}>Send</button>
-          </div>
-        ) : (
-          <div className="readonly-bar">You were removed from this group</div>
-        )}
-      </div>
-    );
+        {
+          isActive ? (
+            <div className="message-input">
+              <input
+                type="text"
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+                placeholder="Type a message..."
+              />
+              <button onClick={sendMessage}>Send</button>
+            </div>
+          ) : (
+            <div className="readonly-bar">You were removed from this group</div>
+          )
+        }
+      </div >
+    )
   }
 
   return (
@@ -1031,8 +1192,8 @@ function App() {
           {tags.map((t) => (
             <button
               key={t.id}
-              className={`filter-tab ${activeTag === t.id ? "active" : ""}`}
-              onClick={() => setActiveTag(activeTag === t.id ? null : t.id)}
+              className={`filter-tab ${activeTags.has(t.id) ? "active" : ""}`}
+              onClick={() => { activeTags.has(t.id) ? removeFromTags(t.id) : addToTags(t.id) }}
             >
               <span className="tag-dot" style={{ background: t.color || "#2563eb" }} />
               {t.name}
@@ -1045,10 +1206,10 @@ function App() {
         <input
           className="search"
           type="text"
-          placeholder="Search a conversation..."
+          placeholder="Search..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setSearchFocused(true)}
+          onFocus={() => { setSearchFocused(true), setSearching(true) }}
           onBlur={() => {
             setSearchFocused(false);
             saveHomeSearch();
@@ -1124,6 +1285,56 @@ function App() {
           </button>
         ))}
       </div>
+
+
+      <div className="search-results">
+        {messageHits.map((hit) => {
+          const conversation = conversations.find((c) => c.id === hit.conversationId);
+          if (!conversation) return null;
+
+          return (
+            <div key={hit.conversationId} className="result-card">
+              <button
+                type="button"
+                className="result-title"
+                onClick={() => openConversation(conversation)}
+              >
+                {titleOf(conversation)}
+                <span className="result-count">{hit.matches.length}</span>
+              </button>
+
+              {hit.matches.map((match) => (
+                <button
+                  key={match.messageId}
+                  type="button"
+                  className="result-hit"
+                  onClick={() => {
+                    pendingJumpRef.current = match.messageId;
+                    openConversation(conversation);
+                  }}
+                >
+                  <div className="result-meta">
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <span>{match.senderUsername}</span>
+                      <span>{match.snippet}</span>
+                    </div>
+
+                    <span>
+                      {new Date(match.createdAt).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                      })}
+                    </span>
+                  </div>
+
+                </button>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+
+
     </div>
   );
 }

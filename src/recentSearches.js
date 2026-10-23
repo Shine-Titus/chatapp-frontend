@@ -6,7 +6,6 @@ export const loadRecent = (key) => {
     try {
         const raw = localStorage.getItem(key);
         const parsed = raw ? JSON.parse(raw) : [];
-        console.log("loadrecent", parsed);
         return Array.isArray(parsed) ? parsed : [];
     } catch {
         return [];
@@ -24,7 +23,6 @@ export const addRecent = (key, term) => {
     const t = term.trim();
     const current = loadRecent(key);
     if (t.length < 2) return current;
-    console.log(current)
 
     const list = [t, ...current.filter((x) => x.toLowerCase() !== t.toLowerCase()),].slice(0, MAX);
     save(key, list);
