@@ -1,5 +1,5 @@
 import { useState } from "react";
-import "./app.css"
+import "../styles/app.css"
 
 const API = "http://localhost:8080";
 

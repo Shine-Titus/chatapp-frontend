@@ -784,6 +784,7 @@ input {
     word-break: break-word;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     /* allow three lines instead of two */
     -webkit-box-orient: vertical;
     overflow: hidden;
