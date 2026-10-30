@@ -1,32 +1,26 @@
-import { removeRecent, clearRecent } from "../../utils/recentSearches.js";
+import { useState } from "react";
+import RecentDropdown from "../RecentDropdown";
 
-function ChatSearchBar({
-  chatQuery,
-  setChatQuery,
-  setChatSearchFocused,
-  saveChatSearch,
-  setCurrentMessageIndex,
-  matchingMessages,
-  currentMessageIndex,
-  chatSearchFocused,
-  chatRecent,
-  setChatRecent,
-  chatKey,
-  setShowSearch,
-}) {
+// `search` comes from useChatSearch, `recent` from useRecentSearches.
+export default function ChatSearchBar({ search, recent, onClose }) {
+  const [focused, setFocused] = useState(false);
+
   return (
     <div className="chat-search">
       <input
         type="text"
         placeholder="Search in this conversation..."
-        value={chatQuery}
-        onChange={(e) => setChatQuery(e.target.value)}
-        onFocus={() => setChatSearchFocused(true)}
-        onBlur={() => { setChatSearchFocused(false); saveChatSearch(); }}
+        value={search.query}
+        onChange={(e) => search.setQuery(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false);
+          recent.save(search.query);
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
-            saveChatSearch();
-            setCurrentMessageIndex(prev => prev + 1);
+            recent.save(search.query);
+            search.next();
           }
         }}
         autoFocus
@@ -34,73 +28,30 @@ function ChatSearchBar({
 
       <div className="search-navigation">
         <span className="search-counter">
-          {matchingMessages.length > 0
-            ? `${currentMessageIndex + 1} of ${matchingMessages.length}`
-            : "0 of 0"}
+          {search.count > 0 ? `${search.position + 1} of ${search.count}` : "0 of 0"}
         </span>
 
-        <button
-          type="button"
-          onClick={() => { currentMessageIndex > 0 ? setCurrentMessageIndex(prev => prev - 1) : setCurrentMessageIndex(prev => prev - 0) }}
-          disabled={matchingMessages.length === 0}
-          title="Previous match"
-        >
+        <button type="button" onClick={search.prev} disabled={search.count === 0} title="Previous match">
           ↑
         </button>
 
-        <button
-          type="button"
-          onClick={() => { currentMessageIndex < matchingMessages.length - 1 ? setCurrentMessageIndex(prev => prev + 1) : setCurrentMessageIndex(prev => prev + 0) }}
-          disabled={matchingMessages.length === 0}
-          title="Next match"
-        >
+        <button type="button" onClick={search.next} disabled={search.count === 0} title="Next match">
           ↓
         </button>
       </div>
 
-      {chatSearchFocused && !chatQuery && chatRecent.length > 0 && (
-        <div className="recent-dropdown">
-          <div className="recent-header">
-            <span>Recent searches</span>
-            <button
-              className="recent-clear"
-              onMouseDown={(e) => { e.preventDefault(); setChatRecent(clearRecent(chatKey)); }}
-            >
-              Clear all
-            </button>
-          </div>
-
-          {chatRecent.map((term) => (
-            <div
-              key={term}
-              className="recent-item"
-              onMouseDown={(e) => { e.preventDefault(); setChatQuery(term); }}
-            >
-              <span className="recent-term">{term}</span>
-              <button
-                className="recent-remove"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setChatRecent(removeRecent(chatKey, term));
-                }}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
+      {focused && !search.query && recent.items.length > 0 && (
+        <RecentDropdown
+          items={recent.items}
+          onPick={search.setQuery}
+          onRemove={recent.remove}
+          onClear={recent.clear}
+        />
       )}
 
-      <button
-        className="chat-search-close"
-        onClick={() => { setShowSearch(false); setChatQuery(""); }}
-      >
+      <button className="chat-search-close" onClick={onClose}>
         ✕
       </button>
-
     </div>
   );
 }
-
-export default ChatSearchBar;

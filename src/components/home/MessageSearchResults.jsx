@@ -1,19 +1,23 @@
-import { titleOf } from "../../utils/titleOf.js";
+import { useNavigate } from "react-router-dom";
+import { useConversations } from "../../context/ConversationsContext";
+import { titleOf } from "../../utils/conversation";
 
-function SearchResults({ messageHits, conversations, openConversation, pendingJumpRef }) {
+// Message hits grouped by conversation. Clicking a hit opens the chat and jumps to that message.
+export default function MessageSearchResults({ hits }) {
+  const navigate = useNavigate();
+  const { conversations } = useConversations();
+
   return (
     <div className="search-results">
-      {messageHits.map((hit) => {
+      {hits.map((hit) => {
         const conversation = conversations.find((c) => c.id === hit.conversationId);
         if (!conversation) return null;
 
+        const open = (state) => navigate(`/chats/${conversation.id}`, { state });
+
         return (
           <div key={hit.conversationId} className="result-card">
-            <button
-              type="button"
-              className="result-title"
-              onClick={() => openConversation(conversation)}
-            >
+            <button type="button" className="result-title" onClick={() => open()}>
               {titleOf(conversation)}
               <span className="result-count">{hit.matches.length}</span>
             </button>
@@ -23,10 +27,7 @@ function SearchResults({ messageHits, conversations, openConversation, pendingJu
                 key={match.messageId}
                 type="button"
                 className="result-hit"
-                onClick={() => {
-                  pendingJumpRef.current = match.messageId;
-                  openConversation(conversation);
-                }}
+                onClick={() => open({ jumpTo: match.messageId })}
               >
                 <div className="result-meta">
                   <div style={{ display: "flex", flexDirection: "column" }}>
@@ -41,7 +42,6 @@ function SearchResults({ messageHits, conversations, openConversation, pendingJu
                     })}
                   </span>
                 </div>
-
               </button>
             ))}
           </div>
@@ -50,5 +50,3 @@ function SearchResults({ messageHits, conversations, openConversation, pendingJu
     </div>
   );
 }
-
-export default SearchResults;

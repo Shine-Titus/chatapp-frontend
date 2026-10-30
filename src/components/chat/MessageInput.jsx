@@ -1,16 +1,18 @@
-function MessageInput({ messageText, setMessageText, sendMessage }) {
+export default function MessageInput({ isActive, value, onChange, onSend }) {
+  if (!isActive) {
+    return <div className="readonly-bar">You were removed from this group</div>;
+  }
+
   return (
     <div className="message-input">
       <input
         type="text"
-        value={messageText}
-        onChange={(e) => setMessageText(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && onSend()}
         placeholder="Type a message..."
       />
-      <button onClick={sendMessage}>Send</button>
+      <button onClick={onSend}>Send</button>
     </div>
   );
 }
-
-export default MessageInput;

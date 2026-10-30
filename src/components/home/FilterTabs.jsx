@@ -1,12 +1,18 @@
-function FilterTabs({ filter, setFilter, unreadTotal }) {
+import { useInboxFilter } from "../../context/InboxFilterContext";
+
+const TABS = [
+  ["all", "All"],
+  ["unread", "Unread"],
+  ["direct", "Direct"],
+  ["group", "Groups"],
+];
+
+export default function FilterTabs() {
+  const { filter, setFilter, unreadTotal } = useInboxFilter();
+
   return (
     <div className="filter-tabs">
-      {[
-        ["all", "All"],
-        ["unread", "Unread"],
-        ["direct", "Direct"],
-        ["group", "Groups"],
-      ].map(([key, label]) => (
+      {TABS.map(([key, label]) => (
         <button
           key={key}
           className={`filter-tab ${filter === key ? "active" : ""}`}
@@ -21,5 +27,3 @@ function FilterTabs({ filter, setFilter, unreadTotal }) {
     </div>
   );
 }
-
-export default FilterTabs;
