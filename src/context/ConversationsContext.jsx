@@ -18,7 +18,7 @@ export function ConversationsProvider({ children }) {
   const openMatch = useMatch({ path: "/chats/:conversationId", end: false });
   const openId = openMatch?.params.conversationId ?? null;
 
-  const refreshConversations = useCallback(() => {
+  const  refreshConversations =  useCallback(async () => {
     return request("/conversations")
       .then((res) => {
         if (res.status === 403) {
@@ -44,13 +44,13 @@ export function ConversationsProvider({ children }) {
 
   const upsertConversation = useCallback((conversation) => {
     setConversations((prev) =>
-      prev.some((c) => c.id === conversation.id)
-        ? prev.map((c) => (c.id === conversation.id ? { ...c, ...conversation } : c))
+      prev.some((c) => sameId(c.id, conversation.id))
+        ? prev.map((c) => (sameId(c.id, conversation.id) ? { ...c, ...conversation } : c))
         : [conversation, ...prev]
     );
   }, []);
 
-  // returns the conversation, or null (session ended / failed)
+
   const createDirectConversation = useCallback(async (userId) => {
     const res = await request("/conversations/direct", { method: "POST", body: { userId } });
 
@@ -90,18 +90,18 @@ export function ConversationsProvider({ children }) {
   // (the open chat appends the message itself in useMessages)
   useSocketSubscription("/user/queue/messages", (frame) => {
     const message = JSON.parse(frame.body);
-    const fromMe = message.senderId === currentUser.id;
+    const fromMe = sameId(message.senderId, currentUser.id);
 
     if (openId !== null && sameId(message.conversationId, openId)) {
       if (!fromMe) markRead(message.conversationId);
       return;
     }
 
-    const known = conversations.some((c) => c.id === message.conversationId);
+    const known = conversations.some((c) => sameId(c.id, message.conversationId));
     if (known) {
       setConversations((prev) =>
         prev.map((c) =>
-          c.id === message.conversationId ? { ...c, unreadCount: (c.unreadCount || 0) + 1 } : c
+          sameId(c.id, message.conversationId) ? { ...c, unreadCount: (c.unreadCount || 0) + 1 } : c
         )
       );
     } else {
@@ -109,6 +109,7 @@ export function ConversationsProvider({ children }) {
     }
   });
 
+  // use memo survives rerenders , improves performance
   const value = useMemo(
     () => ({
       conversations,

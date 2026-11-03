@@ -10,7 +10,6 @@ export default function ConversationLayout() {
 
   if (!conversation) return loaded ? <Navigate to="/" replace /> : null;
 
-  // keyed so switching to another conversation remounts the page with fresh state
   return (
     <Fragment key={conversation.id}>
       <Outlet context={{ conversation }} />

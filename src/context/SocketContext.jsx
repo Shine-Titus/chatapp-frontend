@@ -19,6 +19,7 @@ export function SocketProvider({ children }) {
     const sub = client.subscribe(destination, (frame) => {
       handlers.current.get(destination)?.forEach((handler) => handler(frame));
     });
+    
     stompSubs.current.set(destination, sub);
   }, []);
 

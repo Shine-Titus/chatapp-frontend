@@ -16,6 +16,7 @@ function Register({ onBack }) {
         setError("");
         setSuccess("");
 
+
         try {
             const res = await fetch(`${API}/auth/register`, {
                 method: "POST",
