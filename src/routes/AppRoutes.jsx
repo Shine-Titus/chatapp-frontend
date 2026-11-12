@@ -14,6 +14,7 @@ import ChatPage from "../pages/ChatPage";
 import MembersPage from "../pages/MembersPage";
 import AddMembersPage from "../pages/AddMembersPage";
 import ChatTagsPage from "../pages/ChatTagsPage";
+import ScheduledMessagesPage from "../pages/ScheduledMessagesPage";
 
 export default function AppRoutes() {
   return (
@@ -31,6 +32,7 @@ export default function AppRoutes() {
 
         <Route path="/chats/:conversationId" element={<ConversationLayout />}>
           <Route index element={<ChatPage />} />
+          <Route path="scheduled" element={<ScheduledMessagesPage />} />
           <Route path="members" element={<MembersPage />} />
           <Route path="members/add" element={<AddMembersPage />} />
           <Route path="tags" element={<ChatTagsPage />} />

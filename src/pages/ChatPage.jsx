@@ -78,6 +78,9 @@ export default function ChatPage() {
         </div>
 
         <div className="header-actions">
+          {isActive && (
+            <button className="switch-button" onClick={() => navigate(`${base}/scheduled`)}>Schedule</button>
+          )}
           <button className="switch-button" onClick={() => navigate(`${base}/tags`)}>Tags</button>
           <button className="switch-button" onClick={() => setShowSearch(true)}>Search</button>
           {conversation.type === "GROUP" && isActive && (
