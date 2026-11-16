@@ -99,6 +99,7 @@ export default function ChatPage() {
         value={messageText}
         onChange={setMessageText}
         onSend={handleSend}
+        onAttach={() => navigate(`${base}/upload`)}
       />
     </div>
   );

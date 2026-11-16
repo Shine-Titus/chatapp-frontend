@@ -1,3 +1,5 @@
+import FileCard from "./FileCard";
+
 export default function MessageList({ messages, currentUserId, endRef }) {
   return (
     <div className="messages">
@@ -13,7 +15,7 @@ export default function MessageList({ messages, currentUserId, endRef }) {
           >
             <strong>{mine ? "You" : message.senderUsername}</strong>
             <p>
-              {message.content}
+              {message.type === "FILE" ? <FileCard message={message} /> : message.content}
               <span className={`message ${mine ? "message-time-you" : "message-time-other"}`}>
                 {new Date(message.createdAt).toLocaleTimeString("en-IN", {
                   hour: "2-digit",

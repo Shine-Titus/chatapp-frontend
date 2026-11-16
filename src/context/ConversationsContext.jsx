@@ -65,6 +65,7 @@ export function ConversationsProvider({ children }) {
 
     const conversation = await res.json();
     upsertConversation(conversation);
+    // console.log("inside createDirectConversation:", conversation);
     return conversation;
   }, [endSession, upsertConversation]);
 

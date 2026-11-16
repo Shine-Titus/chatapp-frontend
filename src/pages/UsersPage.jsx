@@ -14,8 +14,13 @@ export default function UsersPage() {
 
   const openDirect = async (userId) => {
     const conversation = await createDirectConversation(userId);
+    // console.log(conversation);
     if (conversation) navigate(`/chats/${conversation.id}`);
   };
+
+  // for (const user of users) {
+  //   console.log(user);
+  // }
 
   return (
     <div className="chat-container">

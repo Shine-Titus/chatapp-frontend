@@ -1,15 +1,16 @@
 import { API } from "./config";
 
-// Thin wrapper around fetch: always sends cookies, JSON-encodes `body` when given.
-// It returns the raw Response so each caller decides how to treat 401/403/404/409.
+// Thin wrapper around fetch: always sends cookies. Plain objects are sent as JSON,
+// FormData (file uploads) is sent as-is. Returns the raw Response.
 export function request(path, { method = "GET", body, signal } = {}) {
   const hasBody = body !== undefined;
+  const isForm = body instanceof FormData;
 
   return fetch(`${API}${path}`, {
     method,
     credentials: "include",
     signal,
-    headers: hasBody ? { "Content-Type": "application/json" } : undefined,
-    body: hasBody ? JSON.stringify(body) : undefined,
+    headers: hasBody && !isForm ? { "Content-Type": "application/json" } : undefined,
+    body: !hasBody ? undefined : isForm ? body : JSON.stringify(body),
   });
 }
