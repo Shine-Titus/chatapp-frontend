@@ -26,7 +26,10 @@ export function useFiles() {
   };
 
   const downloadFile = async (fileId, fileName) => {
+    console.log(fileId);
     const res = await request(`/files/${fileId}`).catch(() => null);
+
+
 
     if (!res) return "Could not download file";
     if (res.status === 403) { endSession(); return null; }

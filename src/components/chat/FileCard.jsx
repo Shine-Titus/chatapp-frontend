@@ -7,7 +7,7 @@ export default function FileCard({ message }) {
   const [error, setError] = useState("");
 
   const handleDownload = async () => {
-    setError((await downloadFile(message.fileId, message.fileName)) || "");
+    setError((await downloadFile(message.fileAttachment.id, message.fileName)) || "");
   };
 
   return (
